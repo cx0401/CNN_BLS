@@ -83,7 +83,9 @@ def sparse_bls(A, b):
 
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-def Conv_Pool(input, padding_size=2, ksize=5, stride=1, pooling_size=2, input_channel=1, out_channel=16):
+def Conv_Pool(input, padding_size=2, ksize=5, stride=1, pooling_size=2, input_channel=1, out_channel=16, kernel_weight = None):
+    if kernel_weight is None:
+        kernel_weight = random.randn(ksize * ksize * input_channel, out_channel)
     len = input.shape[0]
     feature_num = input.shape[1] / input_channel
     w = int(math.sqrt(feature_num))
@@ -99,7 +101,6 @@ def Conv_Pool(input, padding_size=2, ksize=5, stride=1, pooling_size=2, input_ch
     x = np.lib.stride_tricks.as_strided(x, shape=shape, strides=strides)
     # random intialize the weight
     x = x.reshape(x.shape[0], x.shape[1], x.shape[2], -1)
-    kernel_weight = random.randn(ksize * ksize * input_channel, out_channel)
     x = np.dot(x.reshape(-1, x.shape[3]), kernel_weight)
     x = x.reshape(N, oh, ow, out_channel)
     x = relu(x)
@@ -131,9 +132,12 @@ def CNNBLS(train_x, train_y, test_x, test_y, s, c, N1, N2, N3):
     test_time = np.zeros([1, L + 1])
     time_start = time.time()  # 计时开始
 
-    input_channel = 1
-    out_channel = 16
     train_i = train_x
+    input_channel = [1, 16]
+    out_channel = [16, 32]
+    kernel_size = 5
+    kernel_weight = [random.randn(kernel_size * kernel_size * input_channel[i], out_channel[i]) for i in range(N2)]
+
     for i in range(N2):
         random.seed(i)
         FeatureOfInputDataWithBias = np.hstack([train_i, 0.1 * np.ones((train_i.shape[0], 1))])
@@ -152,8 +156,7 @@ def CNNBLS(train_x, train_y, test_x, test_y, s, c, N1, N2, N3):
         outputOfEachWindow = (outputOfEachWindow - minOfEachWindow[i]) / distOfMaxAndMin[i]
         OutputOfFeatureMappingLayer[:, N1 * i:N1 * (i + 1)] = outputOfEachWindow
 
-        train_i = Conv_Pool(train_i, input_channel=input_channel, out_channel=out_channel)
-        input_channel = out_channel
+        train_i = Conv_Pool(train_i, ksize=kernel_size, input_channel=input_channel[i], out_channel=out_channel[i], kernel_weight=kernel_weight[i])
         del outputOfEachWindow
         del FeatureOfEachWindow
         del weightOfEachWindow
@@ -190,14 +193,17 @@ def CNNBLS(train_x, train_y, test_x, test_y, s, c, N1, N2, N3):
     train_time[0][0] = trainTime
     # 测试过程
     test_x = preprocessing.scale(test_x, axis=1)
-    FeatureOfInputDataWithBiasTest = np.hstack([test_x, 0.1 * np.ones((test_x.shape[0], 1))])
     OutputOfFeatureMappingLayerTest = np.zeros([test_x.shape[0], N2 * N1])
+    test_i = test_x
     time_start = time.time()
 
     for i in range(N2):
+        FeatureOfInputDataWithBiasTest = np.hstack([test_i, 0.1 * np.ones((test_x.shape[0], 1))])
         outputOfEachWindowTest = np.dot(FeatureOfInputDataWithBiasTest, Beta1OfEachWindow[i])
         OutputOfFeatureMappingLayerTest[:, N1 * i:N1 * (i + 1)] = (ymax - ymin) * (
                 outputOfEachWindowTest - minOfEachWindow[i]) / distOfMaxAndMin[i] - ymin
+        test_i = Conv_Pool(test_i, ksize=kernel_size, input_channel=input_channel[i], out_channel=out_channel[i], kernel_weight=kernel_weight[i])
+
 
     InputOfEnhanceLayerWithBiasTest = np.hstack(
         [OutputOfFeatureMappingLayerTest, 0.1 * np.ones((OutputOfFeatureMappingLayerTest.shape[0], 1))])

@@ -46,8 +46,8 @@ testdata = np.double(data['test_x']/255)
 testlabel = np.double(data['test_y'])
 
 N1 = 10  #  # of nodes belong to each window
-N2 = 3  #  # of windows -------Feature mapping layer
-N3 = 500 #  # of enhancement nodes -----Enhance layer
+N2 = 2   #  # of windows -------Feature mapping layer
+N3 = 10000 #  # of enhancement nodes -----Enhance layer
 L = 5    #  # of incremental steps 
 M1 = 50  #  # of adding enhance nodes
 s = 0.8  #  shrink coefficient
