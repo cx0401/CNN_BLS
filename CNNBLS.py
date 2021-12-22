@@ -19,7 +19,6 @@ import time
 import math
 import scipy.io as scio
 
-
 def show_accuracy(predictLabel, Label):
     count = 0
     label_1 = np.zeros(Label.shape[0])
