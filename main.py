@@ -28,6 +28,10 @@ pip install scikit-learn
 import numpy as np
 import scipy.io as scio
 from CNNBLS import CNNBLS
+import torch
+import CNNet
+import torch.nn as nn
+import torch.nn.functional as F
 
 ''' For Keras dataset_load()'''
 # import keras 
@@ -40,6 +44,8 @@ from CNNBLS import CNNBLS
 
 dataFile = './mnist.mat'
 data = scio.loadmat(dataFile)
+data['train_x'] = data['train_x']
+data['train_y'] = data['train_y']
 traindata = np.double(data['train_x']/255)
 trainlabel = np.double(data['train_y'])
 testdata = np.double(data['test_x']/255)
@@ -47,14 +53,25 @@ testlabel = np.double(data['test_y'])
 
 N1 = 10  #  # of nodes belong to each window
 N2 = 2   #  # of windows -------Feature mapping layer
-N3 = 10000 #  # of enhancement nodes -----Enhance layer
+N3 = 100000 #  # of enhancement nodes -----Enhance layer
 L = 5    #  # of incremental steps 
 M1 = 50  #  # of adding enhance nodes
 s = 0.8  #  shrink coefficient
 C = 2**-30 # Regularization coefficient
 
 print('-------------------CNNBLS_BASE---------------------------')
-CNNBLS(traindata, trainlabel, testdata, testlabel, s, C, N1, N2, N3)
+
+cnn = CNNet.CNN()
+cnn.load_state_dict(torch.load("model/cnn_test.pth"))
+weight = cnn.state_dict()
+conv1_weight = np.array(weight['conv1.weight'].cpu())
+conv2_weight = np.array(weight['conv2.weight'].cpu())
+conv_weight = [conv1_weight, conv2_weight]
+
+conv1_bias = np.array(weight['conv1.bias'].cpu())
+conv2_bias = np.array(weight['conv2.bias'].cpu())
+conv_bias = [conv1_bias, conv2_bias]
+CNNBLS(traindata, trainlabel, testdata, testlabel, s, C, N1, N2, N3, conv_weight, conv_bias)
 
 
 
