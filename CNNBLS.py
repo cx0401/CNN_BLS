@@ -12,6 +12,7 @@ If you have any questions about the original paper,
 """
 
 import numpy as np
+import torch
 from sklearn import preprocessing
 from numpy import random
 from scipy import linalg as LA
@@ -82,89 +83,17 @@ def sparse_bls(A, b):
         wk = ok
     return wk
 
-
+import CNNet
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def Conv_Pool(input, padding_size=2, ksize=5, stride=1, pooling_size=2, input_channel=1, out_channel=16,
-              kernel_weight=None,kernel_bias=None):
-    if kernel_weight is None:
-        kernel_weight = random.randn(ksize * ksize * input_channel, out_channel)
-    if kernel_bias is None:
-        kernel_bias = random.randn(out_channel)
+              cnn = None, layer = 0):
     len = input.shape[0]
     feature_num = input.shape[1] / input_channel
     w = int(math.sqrt(feature_num))
-    x = input.reshape(len, w, w, input_channel)
-    # padding
-    time_padding = time.time()
-    x_pad = np.pad(x, ((0, 0), (padding_size, padding_size), (padding_size, padding_size), (0, 0)), 'constant')
-    time_padding = time.time()-time_padding
-    print("padding:", time_padding)
-    # conv
-    time_conv = time.time()
-    N, H, W, C = x_pad.shape
-    oh = (H - ksize) // stride + 1
-    ow = (W - ksize) // stride + 1
-    shape = (N, oh, ow, ksize, ksize, C)
-    strides = (x_pad.strides[0], x_pad.strides[1] * stride, x_pad.strides[2] * stride, *x_pad.strides[1:])
-    x_stride = np.lib.stride_tricks.as_strided(x_pad, shape=shape, strides=strides)# 矩阵的一个高效分块操作
-    time_conv = time.time() - time_conv
-    print("conv:", time_conv)
+    x = input.reshape(len,input_channel, w, w)
+    return cnn.feature_extract(torch.Tensor(x), layer).detach().numpy()
 
-
-    # random intialize the weight
-    kernel_weight = kernel_weight.reshape(out_channel, ksize, ksize, input_channel)
-    time_forward = time.time()
-    forward_path = np.einsum_path('ijk...,o...->ijko',x_stride, kernel_weight, optimize='greedy')[0]
-    time_forward = time.time() - time_forward
-    print("find path:", time_forward)
-    time_einsum = time.time()
-    x_einsum = np.einsum('ijk...,o...->ijko', x_stride, kernel_weight, optimize=forward_path)
-    time_einsum = time.time() - time_einsum
-    print("einsum:", time_einsum)
-    time_relu = time.time()
-    x_relu = relu(x_einsum)
-    time_relu = time.time() - time_relu
-    print("relu:", time_relu)
-    time_pool = time.time()
-    x_pool = x_relu.reshape(x_relu.shape[0], x_relu.shape[1] // pooling_size, pooling_size,
-                            x_relu.shape[2] // pooling_size, pooling_size, x_relu.shape[3])
-    x_maxpool = x_pool.max(axis=(2, 4))
-    time_pool = time.time() - time_pool
-    print("pool:", time_pool)
-    y = x_maxpool.reshape(N, -1)
-    del kernel_weight
-    return y
-
-
-
-    time_stride = time.time()
-    x_stride_onedimension = x_stride.reshape(x_stride.shape[0], x_stride.shape[1], x_stride.shape[2], -1)
-    time_stride = time.time() - time_stride
-    print("stride:", time_stride)
-
-    time_channel = time.time()
-    kernel_weight = kernel_weight.reshape(-1, kernel_weight.shape[3])
-    x_kernel = np.dot(x_stride_onedimension.reshape(-1, x_stride_onedimension.shape[3]), kernel_weight)
-    x_bias = x_kernel + kernel_bias
-    x_channel = x_bias.reshape(N, oh, ow, out_channel)
-    time_channel = time.time() - time_channel
-    print("channel:", time_channel)
-    time_relu = time.time()
-    x_relu = relu(x_channel)
-    time_relu = time.time() - time_relu
-    print("relu:", time_relu)
-    time_pool = time.time()
-    x_pool = x_relu.reshape(x_relu.shape[0], x_relu.shape[1] // pooling_size, pooling_size,
-                       x_relu.shape[2] // pooling_size, pooling_size, x_relu.shape[3])
-    x_maxpool = x_pool.max(axis=(2, 4))
-    time_pool = time.time() - time_pool
-    print("pool:", time_pool)
-    y = x_maxpool.reshape(N, -1)
-    del kernel_weight
-    return y
-
-
-def CNNBLS(train_x, train_y, test_x, test_y, s, c, N1, N2, N3, conv_weight, conv_bias):
+def CNNBLS(train_x, train_y, test_x, test_y, s, c, N1, N2, N3, cnn):
     L = 0
     train_x = preprocessing.scale(train_x, axis=1)
     # scale是数据预处理，讲数据集规范化
@@ -188,10 +117,7 @@ def CNNBLS(train_x, train_y, test_x, test_y, s, c, N1, N2, N3, conv_weight, conv
     input_channel = [1, 16]
     out_channel = [16, 32]
     kernel_size = 5
-    # kernel_weight = [random.randn(kernel_size * kernel_size * input_channel[i], out_channel[i]) for i in range(N2)]
-    # kernel_bias = [random.randn(out_channel[i]) for i in range(N2)]
-    kernel_weight = conv_weight
-    kernel_bias = conv_bias
+
     for i in range(N2):
         random.seed(i)
         FeatureOfInputDataWithBias = np.hstack([train_i, 0.1 * np.ones((train_i.shape[0], 1))])
@@ -210,7 +136,7 @@ def CNNBLS(train_x, train_y, test_x, test_y, s, c, N1, N2, N3, conv_weight, conv
         outputOfEachWindow = (outputOfEachWindow - minOfEachWindow[i]) / distOfMaxAndMin[i]
         OutputOfFeatureMappingLayer[:, N1 * i:N1 * (i + 1)] = outputOfEachWindow
         train_i = Conv_Pool(train_i, ksize=kernel_size, input_channel=input_channel[i], out_channel=out_channel[i],
-                            kernel_weight=kernel_weight[i], kernel_bias=kernel_bias[i])
+                            cnn = cnn, layer = i)
         del outputOfEachWindow
         del FeatureOfEachWindow
         del weightOfEachWindow
@@ -256,8 +182,7 @@ def CNNBLS(train_x, train_y, test_x, test_y, s, c, N1, N2, N3, conv_weight, conv
         outputOfEachWindowTest = np.dot(FeatureOfInputDataWithBiasTest, Beta1OfEachWindow[i])
         OutputOfFeatureMappingLayerTest[:, N1 * i:N1 * (i + 1)] = (ymax - ymin) * (
                 outputOfEachWindowTest - minOfEachWindow[i]) / distOfMaxAndMin[i] - ymin
-        test_i = Conv_Pool(test_i, ksize=kernel_size, input_channel=input_channel[i], out_channel=out_channel[i],
-                           kernel_weight=kernel_weight[i], kernel_bias=kernel_bias[i])
+        test_i = Conv_Pool(test_i, ksize=kernel_size, input_channel=input_channel[i], out_channel=out_channel[i],cnn = cnn, layer= i)
 
     InputOfEnhanceLayerWithBiasTest = np.hstack(
         [OutputOfFeatureMappingLayerTest, 0.1 * np.ones((OutputOfFeatureMappingLayerTest.shape[0], 1))])
