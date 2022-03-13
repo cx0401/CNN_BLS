@@ -148,9 +148,9 @@ def cnn_test():
 # 每次训练要训练batch_size个数据
 # 每个batch的数据,第一个维度是数据的下标:0,1,2,...,batch_size-1
 start = time.time()
-for epoch in range(0, 2):
+for epoch in range(0, 20):
     train(epoch)
     end = time.time()
     print('Training time is ', end - start, 's')
-torch.save(obj=cnn.state_dict(), f="model/cnn_final.pth")
+torch.save(obj=cnn.state_dict(), f="model/cnn_notpool.pth")
 cnn_test()
