@@ -13,20 +13,16 @@ class CNN(nn.Module):  # 定义了一个类,名字叫CNN
         # Conv2d(in_cahnnels, out_channels, kernel_size, stride, padding=0 ,...)
         self.conv1 = nn.Conv2d(1, 16, 5, 1, 2)  # 卷积层1: 二维卷积层, 1x28x28,16x28x28, 卷积核大小为5x5
         self.conv2 = nn.Conv2d(16, 32, 5, 1, 2)  # 卷积层2: 二维卷积层, 16x14x14,32x14x14, 卷积核大小为5x5
+        self.conv3 = nn.Conv2d(32, 32, 5, 1, 2)  # 卷积层2: 二维卷积层, 16x14x14,32x14x14, 卷积核大小为5x5
+        self.conv = [self.conv1, self.conv2, self.conv3]
         # an affine(仿射) operation: y = Wx + b # 全连接层1: 线性层, 输入维度32x7x7,输出维度128
         self.fc1 = nn.Linear(32 * 7 * 7, 128)
         self.fc2 = nn.Linear(128, 10)  # 全连接层2: 线性层, 输入维度128,输出维度10
 
-    def feature_extract1(self, x):
+    def feature_extract(self, x, i):
         # Max pooling over a (2, 2) window
-        conv1_out = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))  # 先卷积,再池化
-        res = conv1_out.view(conv1_out.size(0), -1)  # 将conv3_out展开成一维(扁平化)
-        return res
-
-    def feature_extract2(self, x):
-        # If the size is a square you can only specify a single number
-        conv2_out = F.max_pool2d(F.relu(self.conv2(x)), 2)  # 再卷积,再池化
-        res = conv2_out.view(conv2_out.size(0), -1)  # 将conv3_out展开成一维(扁平化)
+        conv_out = F.max_pool2d(F.relu(self.conv[i](x)), (2, 2))  # 先卷积,再池化
+        res = conv_out.view(conv_out.size(0), -1)  # 将conv3_out展开成一维(扁平化)
         return res
 
     def forward(self, x):  # 定义了forward函数

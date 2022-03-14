@@ -1,3 +1,6 @@
+import ctypes
+libgcc_s = ctypes.CDLL('libgcc_s.so.1')
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,6 +11,7 @@ import matplotlib.pyplot as plt
 import time
 import CNNet
 import numpy
+
 
 
 # 1 准备数据
@@ -144,9 +148,9 @@ def cnn_test():
 # 每次训练要训练batch_size个数据
 # 每个batch的数据,第一个维度是数据的下标:0,1,2,...,batch_size-1
 start = time.time()
-for epoch in range(0, 20):
+for epoch in range(0, 0):
     train(epoch)
     end = time.time()
     print('Training time is ', end - start, 's')
-torch.save(obj=cnn.state_dict(), f="model/cnn_try.pth")
+torch.save(obj=cnn.state_dict(), f="model/cnn_random.pth")
 cnn_test()
